@@ -1,0 +1,111 @@
+server:
+  port: ${SERVER_PORT:8889}
+  servlet:
+    context-path: /api
+  application:
+    name: ${APP_NAME:client-service}
+
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    allow-circular-references: true
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5435}/${POSTGRES_DB:keycloakdb}
+    username: ${POSTGRES_USER:admin}
+    password: ${POSTGRES_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+    hibernate:
+
+      ddl-auto: create
+
+  mvc:
+    format:
+      date-time: yyyy-MM-dd HH:mm:ss
+      date: yyyy-MM-dd
+      time: HH:mm:ss
+
+  jackson:
+    time-zone: UTC
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${ISSUER_URI:http://38.242.218.13:8081/auth/realms/client}
+          jwk-set-uri: ${JWK_SET_URI:http://38.242.218.13:8081/auth/realms/client/protocol/openid-connect/certs}
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 5000
+            loggerLevel: basic
+# JWT Configuration
+jwt:
+  auth:
+    converter:
+      principal-attribute: email
+      resource-id: client
+
+ms-iam-url: ${MS_IAM_URL:http://localhost:8888/api/v1/users}
+ms-messaging-url: ${MS_MESSAGING_URL:http://localhost:8888/api/v1}
+keycloak:
+  realm: client
+
+resilience4j:
+  rateLimiter:
+    instances:
+      createClient:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+        subscribe-for-events: true
+        allow-health-indicator-to-fail: true
+        register-health-indicator: true
+        event-consumer-buffer-size: 50
+      deleteClient:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+        subscribe-for-events: true
+        allow-health-indicator-to-fail: true
+        register-health-indicator: true
+        event-consumer-buffer-size: 50
+      getTeamMember:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+        subscribe-for-events: true
+        allow-health-indicator-to-fail: true
+        register-health-indicator: true
+        event-consumer-buffer-size: 50
+      getAllTeamMember:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+        subscribe-for-events: true
+        allow-health-indicator-to-fail: true
+        register-health-indicator: true
+        event-consumer-buffer-size: 50
+      getClientPersonalInfo:
+        limit-for-period: 5
+        limit-refresh-period: 60s
+        timeout-duration: 0s
+        subscribe-for-events: true
+        allow-health-indicator-to-fail: true
+        register-health-indicator: true
+        event-consumer-buffer-size: 50
+
+swagger-config:
+  token-url: http://38.242.218.13:8081/auth/realms/client/protocol/openid-connect/token
+  authorization-url: http://38.242.218.13:8081/auth/realms/client/protocol/openid-connect/auth
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: client
+      client-secret: 5dfa0303-0e33-4ebd-8409-1a4d536eea5b

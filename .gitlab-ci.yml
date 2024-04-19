@@ -1,0 +1,87 @@
+image: docker:latest
+ 
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay
+
+stages:
+  - build
+  - test
+  - sonarqube-check
+  - dockerbuild
+  - deploy
+
+
+build:
+  image: maven:3.8.3-openjdk-17
+  variables:
+    MAVEN_OPTS: -Dmaven.repo.local=/cache/maven.repository
+  tags:
+    - dna
+  stage: build
+  script: "mvn clean install -DskipTests"
+  artifacts:
+    paths:
+      - target/client-0.0.1-SNAPSHOT.jar
+
+test:
+  image: maven:3.8.3-openjdk-17
+  variables:
+    MAVEN_OPTS: -Dmaven.repo.local=/cache/maven.repository
+  stage: test
+  except:
+    refs:
+      - develop
+      - master
+  tags:
+    - dna
+  script:
+    - mvn test
+
+sonarqube-check:
+  image: maven:3.8.3-openjdk-17
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  stage: sonarqube-check
+  except:
+    refs:
+      - develop
+      - master
+  tags:
+    - dna
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - mvn verify sonar:sonar -Dsonar.qualitygate.wait=true -Dsonar.projectKey=conversational-talent-intelligence-platform_digital-platform_client-ms_AY5min1FN6FpvIg6BRKw -Dsonar.branch.name=$CI_COMMIT_REF_NAME
+
+
+dockerbuild:
+  image: docker:dind
+  stage: dockerbuild
+  services:
+    - docker:dind
+  tags:
+    - dna
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -f ./Dockerfile -t $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_BRANCH .
+    - docker push $CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_BRANCH
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  
+  
+
+deploy:
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  variables:
+    UPSTREAM_COMMIT_BRANCH: $CI_COMMIT_BRANCH
+    UPSTREAM_IMAGE_TAG_VAR: $SERVICE_IMAGE_TAG_VAR_NAME
+  trigger:
+    project: conversational-talent-intelligence-platform/digital-platform/provisioning
