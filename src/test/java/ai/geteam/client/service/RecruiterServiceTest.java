@@ -7,22 +7,32 @@ import ai.geteam.client.entity.recruiter.Recruiter;
 import ai.geteam.client.repository.RecruiterRepository;
 import ai.geteam.client.service.recruiter.RecruiterService;
 import ai.geteam.client.service.recruiter.RecruiterServiceImpl;
+import io.swagger.v3.oas.models.servers.Server;
 import ai.geteam.client.entity.recruiter.Status;
 import ai.geteam.client.exception.InvalidInputException;
+import ai.geteam.client.exception.ServerException;
+import ai.geteam.client.exception.UnAuthorizedException;
+import ai.geteam.client.feign.IamService;
+import ai.geteam.client.helper.JwtHelper;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.keycloak.representations.account.UserRepresentation;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +53,12 @@ public class RecruiterServiceTest {
     
     @Mock
     private RecruiterRepository recruiterRepository;
+
+    @Mock
+    private IamService iamService;
+
+    @Mock
+    private JwtHelper jwtHelper;
 
     @InjectMocks
     private RecruiterServiceImpl recruiterService;
@@ -72,6 +88,8 @@ public class RecruiterServiceTest {
     }
 
     @Test
+    @Tag("GetTeamMember")
+    @DisplayName("GetTeamMember")
     void RecruiterService_getTeamMember_ReturnsRecruiter() {
         // Arrange
         when(recruiterRepository.findById(1L)).thenReturn(Optional.of(recruiter1));
@@ -83,6 +101,8 @@ public class RecruiterServiceTest {
     }
 
     @Test
+    @Tag("GetTeamMember")
+    @DisplayName("GetTeamMember")
     void RecruiterService_getTeamMember_ReturnsNone() {
         // Arrange
         when(recruiterRepository.findById(99L)).thenReturn(Optional.empty());
@@ -95,6 +115,8 @@ public class RecruiterServiceTest {
     }
 
     @Test
+    @Tag("GetAllTeamMember")
+    @DisplayName("GetAllTeamMember")
     void RecruiterService_GetAllTeamMember_ReturnsRecruiters(){
         // Arrange
         // Mocking SecurityContextHolder
@@ -119,6 +141,8 @@ public class RecruiterServiceTest {
     }
 
     @Test
+    @Tag("GetAllTeamMember")
+    @DisplayName("GetAllTeamMember")
     void RecruiterService_GetAllTeamMember_ReturnsNoRecruiter(){
         // Arrange
         when(authentication.getName()).thenReturn("recruiter1@gmail.com");
@@ -134,6 +158,8 @@ public class RecruiterServiceTest {
     }
     
     @Test
+    @Tag("GetAllTeamMember")
+    @DisplayName("GetAllTeamMember")
     void RecruiterService_GetAllTeamMember_ReturnsNoCompany(){
         // Arrange
         Recruiter recruiterTestNoCompany = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter99@gmail.com", false, "0606060606", null, Status.ACTIVE);
@@ -149,4 +175,295 @@ public class RecruiterServiceTest {
         });
         verify(recruiterRepository, times(0)).findAllByCompany(company1);
     }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsDeleted(){
+        // Arrange
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        Recruiter recruiterToDelete = new Recruiter();
+        recruiterToDelete.setEmail(recruiterToDeleteEmail);
+        recruiterToDelete.setId(clientId);
+        Company deleteCompany = new Company();
+        deleteCompany.setId(recruiterCompanyId); // Same company as the current recruiter
+        recruiterToDelete.setCompany(deleteCompany);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+
+        // Mocking behavior of repository methods
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.of(recruiterToDelete));
+        // when(iamService.deleteUser(anyString(), anyString(), anyString())).thenReturn(ResponseEntity.ok().build());
+        
+        // Mocking behavior of IAM service
+        UserRepresentation userRepresentation = new UserRepresentation();
+        userRepresentation.setId("123456");
+        when(iamService.getUserByUsername(anyString(), anyString(), anyString())).thenReturn(List.of(userRepresentation));
+
+        // Act
+        boolean result = recruiterService.deleteClient(clientId, authorization);
+
+        // Assert
+        assertTrue(result);
+        verify(iamService).deleteUser(anyString(), eq("123456"), eq(authorization));
+        verify(recruiterRepository).deleteById(clientId);
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsEmailnotFound(){
+        // assert
+        String authorization = "Bearer token";
+        when(jwtHelper.extractEmail(authorization)).thenReturn(null);
+        // Act & Assert
+        assertThrows(UnAuthorizedException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+            
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsNoRecruiter(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.empty());
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+            
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsNotAdmin(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        Long recruiterCompanyId = 1L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(false);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+            
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsRecruiterToDeleeteNotFound(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.empty());
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+            
+        verify(recruiterRepository, times(1)).findById(anyLong());
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsNotSameCompany(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        Recruiter recruiterToDelete = new Recruiter();
+        recruiterToDelete.setEmail(recruiterToDeleteEmail);
+        recruiterToDelete.setId(clientId);
+        Company deleteCompany = new Company();
+        deleteCompany.setId(2L); // Same company as the current recruiter
+        recruiterToDelete.setCompany(deleteCompany);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.of(recruiterToDelete));
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+            
+        verify(recruiterRepository, times(1)).findById(anyLong());
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsNotFoundInKeycloak(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        Recruiter recruiterToDelete = new Recruiter();
+        recruiterToDelete.setEmail(recruiterToDeleteEmail);
+        recruiterToDelete.setId(clientId);
+        Company deleteCompany = new Company();
+        deleteCompany.setId(recruiterCompanyId); // Same company as the current recruiter
+        recruiterToDelete.setCompany(deleteCompany);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.of(recruiterToDelete));
+        UserRepresentation userRepresentation = new UserRepresentation();
+        userRepresentation.setId("123456");
+        when(iamService.getUserByUsername(anyString(), anyString(), anyString())).thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+        
+        verify(recruiterRepository, times(1)).findById(anyLong());
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(0)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsExceptionIamService(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        Recruiter recruiterToDelete = new Recruiter();
+        recruiterToDelete.setEmail(recruiterToDeleteEmail);
+        recruiterToDelete.setId(clientId);
+        Company deleteCompany = new Company();
+        deleteCompany.setId(recruiterCompanyId); // Same company as the current recruiter
+        recruiterToDelete.setCompany(deleteCompany);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.of(recruiterToDelete));
+        UserRepresentation userRepresentation = new UserRepresentation();
+        userRepresentation.setId("123456");
+        when(iamService.getUserByUsername(anyString(), anyString(), anyString())).thenReturn(List.of(userRepresentation));
+        when(iamService.deleteUser(anyString(), anyString(), anyString())).thenThrow(new ServerException("Error in IAM service"));
+
+        // Act & Assert
+        assertThrows(ServerException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+        
+        verify(recruiterRepository, times(1)).findById(anyLong());
+        verify(recruiterRepository, times(0)).deleteById(null);
+        verify(iamService, times(1)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("DeleteClient")
+    @DisplayName("DeleteClient")
+    void RecruiterService_DeleteClient_ReturnsExceptionRecruiterRepo(){
+        String authorization = "Bearer token";
+        String recruiterEmail = "admin@example.com";
+        String recruiterToDeleteEmail="toDelete@example.com";
+        Long recruiterCompanyId = 1L;
+        Long clientId = 123L;
+
+        Recruiter currentRecruiter = new Recruiter();
+        currentRecruiter.setEmail(recruiterEmail);
+        currentRecruiter.setAdmin(true);
+        Company company = new Company();
+        company.setId(recruiterCompanyId);
+        currentRecruiter.setCompany(company);
+
+        Recruiter recruiterToDelete = new Recruiter();
+        recruiterToDelete.setEmail(recruiterToDeleteEmail);
+        recruiterToDelete.setId(clientId);
+        Company deleteCompany = new Company();
+        deleteCompany.setId(recruiterCompanyId); // Same company as the current recruiter
+        recruiterToDelete.setCompany(deleteCompany);
+
+        when(jwtHelper.extractEmail(authorization)).thenReturn(recruiterEmail);
+        when(recruiterRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(currentRecruiter));
+        when(recruiterRepository.findById(clientId)).thenReturn(Optional.of(recruiterToDelete));
+        UserRepresentation userRepresentation = new UserRepresentation();
+        userRepresentation.setId("123456");
+        when(iamService.getUserByUsername(anyString(), anyString(), anyString())).thenReturn(List.of(userRepresentation));
+        // we used do throw because recruiterrepo.delete is a void method and the when method doesn't accept void methods
+        doThrow(new ServerException("Error in Recruiter Database")).when(recruiterRepository).deleteById(anyLong());        
+        // Act & Assert
+        assertThrows(ServerException.class, () -> 
+            recruiterService.deleteClient(123L, authorization));
+        
+        verify(recruiterRepository, times(1)).deleteById(anyLong());
+        verify(iamService, times(1)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+
 }
