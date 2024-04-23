@@ -2,6 +2,7 @@ package ai.geteam.client.controller;
 
 import ai.geteam.client.dto.CompanyCountryInfoDTO;
 import ai.geteam.client.dto.CompanyDTO;
+import ai.geteam.client.dto.HiringConsultantDTO;
 import ai.geteam.client.service.company.CompanyService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,12 @@ public class CompanyController {
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<CompanyCountryInfoDTO> getCompanyInfo(@RequestHeader(name = "Authorization") String authorization) {
         return ResponseEntity.ok(service.getCompanyInfo(authorization));
+    }
+
+    @GetMapping("me/hiringconsultant")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<HiringConsultantDTO> getHiringConsultant(@RequestHeader(name = "Authorization") String authorization) {
+        return ResponseEntity.ok(service.getHiringConsultant(authorization));
     }
 
 }

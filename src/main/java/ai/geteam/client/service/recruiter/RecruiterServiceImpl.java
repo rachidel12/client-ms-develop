@@ -1,13 +1,7 @@
 package ai.geteam.client.service.recruiter;
 
 
-
-import ai.geteam.client.dto.InvitationEmailRequestDTO;
-import ai.geteam.client.dto.ClientAccountInfoDTO;
-import ai.geteam.client.dto.InvitationEmailRequestDTO;
-import ai.geteam.client.dto.RecruiterDTO;
-import ai.geteam.client.dto.RoleDTO;
-import ai.geteam.client.dto.SignatureDTO;
+import ai.geteam.client.dto.*;
 import ai.geteam.client.entity.recruiter.Recruiter;
 import ai.geteam.client.entity.recruiter.Status;
 import ai.geteam.client.entity.signatue.Signature;
@@ -20,11 +14,11 @@ import ai.geteam.client.feign.IamService;
 import ai.geteam.client.helper.JwtHelper;
 import ai.geteam.client.mapper.ClientAccountInfoMapper;
 import ai.geteam.client.mapper.RecruiterMapper;
+import ai.geteam.client.mapper.SignatureMapper;
 import ai.geteam.client.repository.CompanyRepository;
 import ai.geteam.client.repository.RecruiterRepository;
-import ai.geteam.client.service.recruiter.validator.EmailValidator;
-import ai.geteam.client.mapper.SignatureMapper;
 import ai.geteam.client.repository.SignatureRepository;
+import ai.geteam.client.service.recruiter.validator.EmailValidator;
 import ai.geteam.client.service.token.TokenService;
 import ai.geteam.client.utils.MainUtils;
 import ai.geteam.client.utils.RecruiterValidation;
@@ -63,7 +57,7 @@ public class RecruiterServiceImpl implements RecruiterService {
 
     private final TokenService tokenService;
 
-    @Value("keycloak.realm")
+    @Value("${keycloak.realm}")
     public String realm;
 
     private final SignatureRepository signatureRepository;
@@ -74,12 +68,17 @@ public class RecruiterServiceImpl implements RecruiterService {
 
     @Override
     public RecruiterDTO getTeamMember(Long userId) {
+        Recruiter recruiter = getRecruiter(userId);
+        return RecruiterMapper.toRecruiterDTO(recruiter);
+    }
+
+    private Recruiter getRecruiter(Long userId) {
         Optional<Recruiter> recruiterOptional = recruiterRepository.findById(userId);
         if (recruiterOptional.isEmpty()) {
             log.error("User not found");
             throw new InvalidInputException(ErrorCode.USER_NOT_FOUND, "User not found");
         }
-        return RecruiterMapper.toRecruiterDTO(recruiterOptional.get());
+        return recruiterOptional.get();
     }
 
     public List<RecruiterDTO> getAllTeamMember() {
@@ -194,7 +193,7 @@ public class RecruiterServiceImpl implements RecruiterService {
             throw new InvalidInputException(ErrorCode.EMAIL_EMPTY, "The field email is empty");
         }
         emailValidator.test(userEmail);
-        validator.userDoesNotExist(userEmail,authorizationHeader);
+        validator.userDoesNotExist(userEmail, authorizationHeader);
         Long companyId = validator.extractCompanyId(authorizationHeader);
         RecruiterDTO newRecruiterDTO = RecruiterDTO.builder()
                 .email(userEmail)
@@ -304,16 +303,16 @@ public class RecruiterServiceImpl implements RecruiterService {
 
         //SINON
         recruiter.setStatus(Status.ACTIVE);
-        unblockRecruiterInKeycloak(recruiter);
+        unblockRecruiterInKeycloak(recruiter.getEmail(), authorization);
 
         Recruiter updatedRecruiter = recruiterRepository.save(recruiter);
 
         return RecruiterMapper.toRecruiterDTO(updatedRecruiter);
     }
 
-    private void unblockRecruiterInKeycloak(Recruiter recruiter) {
+    private void unblockRecruiterInKeycloak(String email, String authorization) {
 
-        ResponseEntity<String> response = iamService.unblockRecruiter(realm, recruiter.getEmail());
+        ResponseEntity<String> response = iamService.unblockRecruiter(realm, email, authorization);
         if (response.getStatusCode() != HttpStatus.OK) {
             String message = "unable to unblock client";
             log.error(message);
@@ -327,15 +326,15 @@ public class RecruiterServiceImpl implements RecruiterService {
         // get the authentication token
         log.info("getting authentication token");
         Jwt token = tokenService.getToken(authentication);
-        //get the client to block
-        RecruiterDTO client = getTeamMember(id);
-        log.info("getting the client to block with id : " + client.getId());
-        //test if client already blocked
-        if (client.getStatus().equals(Status.BLOCKED)) {
+        //get the recruiter to block
+        Recruiter recruiter = getRecruiter(id);
+        log.info("getting the recruiter to block with id : " + recruiter.getId());
+        //test if recruiter already blocked
+        if (recruiter.getStatus().equals(Status.BLOCKED)) {
             log.error("Client already blocked");
-            throw new InvalidInputException(ErrorCode.USER_ALREADY_BLOCKED, "client already blocked");
+            throw new InvalidInputException(ErrorCode.USER_ALREADY_BLOCKED, "recruiter already blocked");
         }
-        //get the admin email to get the recruiter in ms-client database
+        //get the admin email to get the recruiter in ms-recruiter database
         String userEmail = (String) token.getClaims().get("email");
         log.info("getting the user email (Admin) : " + userEmail);
         //test if the token has a none empty email
@@ -343,39 +342,38 @@ public class RecruiterServiceImpl implements RecruiterService {
             throw new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_INVALID, "There is no email in this token");
         RecruiterDTO admin = getRecruiterByEmail(userEmail);
         log.info("get the admin from database using email");
-        //check if the client and admin are the same
-        if (admin.getId().equals(client.getId())) {
-            log.error("The user and the client to block are the same");
-            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "The user is the client to be blocked");
+        //check if the recruiter and admin are the same
+        if (admin.getId().equals(recruiter.getId())) {
+            log.error("The user and the recruiter to block are the same");
+            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "The user is the recruiter to be blocked");
         }
         if (!admin.isAdmin()) {
             log.error("the user is not an admin, unauthorized action");
             throw new InvalidInputException(ErrorCode.USER_NOT_ADMIN, "User is not an admin");
         }
-        //check if the user has client role
+        //check if the user has recruiter role
         String clientRole = tokenService.getRole(token).stream().filter(item -> item.equals("CLIENT")).findFirst().orElseThrow(() -> new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_ROLE_CLIENT, "User is unauthorized to do this action"));
         log.info("The admin is with " + clientRole + " Role");
 
-        //test if the admin and client are in the same team
-        if (!((admin.getCompanyId()).equals(client.getCompanyId()))) {
+        //test if the admin and recruiter are in the same team
+        if (!((admin.getCompanyId()).equals(recruiter.getCompany().getId()))) {
             log.error("The admin and the user are not in the same team, unauthorized action");
-            throw new InvalidInputException(ErrorCode.USER_NOT_IN_SAME_TEAM, "admin and client not in the same team");
+            throw new InvalidInputException(ErrorCode.USER_NOT_IN_SAME_TEAM, "admin and recruiter not in the same team");
         }
-        //test if access token is in the keycloak realm 'client'
-        if (!(tokenService.getRealm(token).equals("client"))) {
-            log.error("the access token is not from 'client' realm");
-            throw new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_REALM_CLIENT, " user is not in 'client' realm");
+        //test if access token is in the keycloak realm 'recruiter'
+        if (!(tokenService.getRealm(token).equals("recruiter"))) {
+            log.error("the access token is not from 'recruiter' realm");
+            throw new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_REALM_CLIENT, " user is not in 'recruiter' realm");
         }
-        Recruiter r = RecruiterMapper.toRecruiter(client);
-        r.setStatus(Status.BLOCKED);
-        r = recruiterRepository.save(r);
-        blockRecruiterInKeycloak(r);
-        return RecruiterMapper.toRecruiterDTO(r);
+        recruiter.setStatus(Status.BLOCKED);
+        recruiter = recruiterRepository.save(recruiter);
+        blockRecruiterInKeycloak(recruiter.getEmail(), token.getTokenValue());
+        return RecruiterMapper.toRecruiterDTO(recruiter);
     }
 
-    private void blockRecruiterInKeycloak(Recruiter r) {
+    private void blockRecruiterInKeycloak(String email, String token) {
 
-        ResponseEntity<String> response = iamService.blockRecruiter(realm, r.getEmail());
+        ResponseEntity<String> response = iamService.blockRecruiter(realm, email, "Bearer " + token);
         if (response.getStatusCode() != HttpStatus.OK) {
             String message = "unable to block client";
             log.error(message);

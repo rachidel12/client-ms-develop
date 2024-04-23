@@ -74,8 +74,8 @@ public class RecruiterServiceTest {
 
     @BeforeEach
     public void setUp() {
-        company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, null, null, null);
-        company2 = new Company(2L, "Company Test 2", "www.companytest2.com", "size2", null, null, null, null, null);
+        company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, null, null, null, null, null);
+        company2 = new Company(2L, "Company Test 2", "www.companytest2.com", "size2", null, null, null, null, null, null, null);
         recruiter1 = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", false, "0606060606", company1, Status.ACTIVE);
         recruiter2 = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
         recruiter3 = new Recruiter(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", company2, Status.ACTIVE);

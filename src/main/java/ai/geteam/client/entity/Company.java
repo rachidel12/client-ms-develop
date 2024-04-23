@@ -41,6 +41,12 @@ public class Company {
     @Column(nullable = false)
     private String size;
 
+    @Column(nullable = false)
+    private String hiringConsultantName;
+
+    @Column(nullable = false)
+    private String hiringConsultantEmail;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "country_id", nullable = false)
     private Country country;
@@ -66,10 +72,10 @@ public class Company {
 
     public void removeRecruiter(Recruiter recruiter) {
         this.recruiters.remove(recruiter);
-        recruiter   .setCompany(null);
+        recruiter.setCompany(null);
     }
 
-    public List<Signature> addSignature(Signature signature){
+    public List<Signature> addSignature(Signature signature) {
         this.signatures.add(signature);
         return this.signatures;
     }

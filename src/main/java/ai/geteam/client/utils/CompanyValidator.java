@@ -4,6 +4,8 @@ import ai.geteam.client.dto.CompanyDTO;
 
 import java.util.regex.Pattern;
 
+import static ai.geteam.client.utils.RecruiterValidator.isValidEmail;
+
 public class CompanyValidator {
     private CompanyValidator() {
 
@@ -17,6 +19,8 @@ public class CompanyValidator {
                 && isValidName(company.getName())
                 && isValidSize(company.getSize())
                 && isValidWebsite(company.getWebsite())
+                && isValidName(company.getHiringConsultantName())
+                && isValidEmail(company.getHiringConsultantEmail())
                 && RecruiterValidator.isValid(company.getRecruiter());
     }
 

@@ -18,6 +18,10 @@ public class CompanyDTO {
 
     private String website;
 
+    private String hiringConsultantName;
+
+    private String hiringConsultantEmail;
+
     private String size;
 
     private Long countryId;

@@ -24,7 +24,7 @@ public class RecruiterValidator {
                 && Pattern.matches("^\\+(\\d{1,3})\\d{4,12}$", phone);
     }
 
-    private static boolean isValidEmail(String email) {
+    public static boolean isValidEmail(String email) {
         return email != null
                 && Pattern.matches("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", email);
     }

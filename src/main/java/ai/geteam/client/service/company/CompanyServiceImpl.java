@@ -1,35 +1,33 @@
 package ai.geteam.client.service.company;
 
 
-import ai.geteam.client.dto.ClientAccountInfoDTO;
 import ai.geteam.client.dto.CompanyCountryInfoDTO;
 import ai.geteam.client.dto.CompanyDTO;
-import ai.geteam.client.entity.location.*;
-import ai.geteam.client.exception.UnAuthorizedException;
-import ai.geteam.client.exception.utils.ErrorCode;
-import ai.geteam.client.helper.JwtHelper;
+import ai.geteam.client.dto.HiringConsultantDTO;
 import ai.geteam.client.dto.RecruiterDTO;
 import ai.geteam.client.entity.Company;
+import ai.geteam.client.entity.location.City;
+import ai.geteam.client.entity.location.Country;
+import ai.geteam.client.entity.location.State;
 import ai.geteam.client.entity.recruiter.Recruiter;
 import ai.geteam.client.exception.DuplicationException;
 import ai.geteam.client.exception.InvalidInputException;
+import ai.geteam.client.exception.UnAuthorizedException;
+import ai.geteam.client.exception.utils.ErrorCode;
+import ai.geteam.client.helper.JwtHelper;
 import ai.geteam.client.mapper.CompanyCountryInfoMapper;
 import ai.geteam.client.mapper.CompanyMapper;
 import ai.geteam.client.mapper.RecruiterMapper;
 import ai.geteam.client.repository.*;
-import ai.geteam.client.service.recruiter.RecruiterService;
-import ai.geteam.client.repository.CityRepository;
-import ai.geteam.client.repository.CompanyRepository;
-import ai.geteam.client.repository.RecruiterRepository;
 import ai.geteam.client.service.recruiter.RecruiterValidator;
 import ai.geteam.client.utils.CompanyValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
-import java.util.regex.Pattern;
+
 import java.util.List;
 import java.util.Optional;
-
+import java.util.regex.Pattern;
 
 
 @Service
@@ -57,6 +55,7 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public String create(CompanyDTO companyDTO) {
+        log.info("Receved companyDTO : "+companyDTO);
 
         if (!CompanyValidator.isValid(companyDTO)) {
             log.error(CLIENT_INVALID_ERROR_MSG);
@@ -77,7 +76,6 @@ public class CompanyServiceImpl implements CompanyService {
         });
 
 
-
         Recruiter recruiter = RecruiterMapper.toRecruiter(recruiterDTO);
 
 
@@ -86,7 +84,7 @@ public class CompanyServiceImpl implements CompanyService {
         company.setCountry(city.getCountry());
         company.addRecruiter(recruiter);
         company = companyRepository.save(company);
-
+        log.info("Company well saved");
         return company.getId().toString();
     }
 
@@ -97,7 +95,7 @@ public class CompanyServiceImpl implements CompanyService {
         return "Deleted";
     }
 
-    private boolean  emailInUse(String email) {
+    private boolean emailInUse(String email) {
         return recruiterRepository.existsByEmail(email);
     }
 
@@ -117,20 +115,20 @@ public class CompanyServiceImpl implements CompanyService {
                 && Pattern.matches("^[a-zA-Z0-9]{1,30}$", name);
     }
 
-@Override
-    public CompanyDTO updateCompanyById(CompanyDTO companyDTO,String token){
-        if(!isValidWebsite(companyDTO.getWebsite())){
-            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION,"Invalid Website");
+    @Override
+    public CompanyDTO updateCompanyById(CompanyDTO companyDTO, String token) {
+        if (!isValidWebsite(companyDTO.getWebsite())) {
+            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "Invalid Website");
         }
-        if(!isValidSize(companyDTO.getSize())){
-            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION,"Invalid Size");
+        if (!isValidSize(companyDTO.getSize())) {
+            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "Invalid Size");
         }
-        if(!isValidName(companyDTO.getName())){
-            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION,"Invalid Name");
+        if (!isValidName(companyDTO.getName())) {
+            throw new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "Invalid Name");
         }
         Company company = companyRepository.findById(companyDTO.getId())
                 .orElseThrow(() ->
-                        new InvalidInputException(ErrorCode.GENERAL_EXCEPTION,"Company with id: " + companyDTO.getId()+" not found"));
+                        new InvalidInputException(ErrorCode.GENERAL_EXCEPTION, "Company with id: " + companyDTO.getId() + " not found"));
 
 
         //email from token
@@ -141,47 +139,45 @@ public class CompanyServiceImpl implements CompanyService {
 
 
 // recruiter2 is the recruiter doing the request based on the  email retrieved from token
-        Recruiter recruiter= recruiters.stream().filter(r ->
-                    r.getEmail().equals(email)
-            ).findFirst()
-                 .orElseThrow(() ->
-                       new  UnAuthorizedException(ErrorCode.ADMIN_INVALID,"Not a Recruiter for this Company"));
+        Recruiter recruiter = recruiters.stream().filter(r ->
+                        r.getEmail().equals(email)
+                ).findFirst()
+                .orElseThrow(() ->
+                        new UnAuthorizedException(ErrorCode.USER_NOT_ADMIN, "Not a Recruiter for this Company"));
 
 
-            if(!recruiter.isAdmin()){
-                throw new UnAuthorizedException(ErrorCode.ADMIN_INVALID,"Not an Admin for this Company");
-            }
+        if (!recruiter.isAdmin()) {
+            throw new UnAuthorizedException(ErrorCode.USER_NOT_ADMIN, "Not an Admin for this Company");
+        }
 
 
-
-    City city = cityRepository.findById(companyDTO.getCityId()).orElseThrow(() -> {
-        log.error(CLIENT_INVALID_ERROR_MSG2);
-        return new InvalidInputException(ErrorCode.CLIENT_INVALID, "Country not found");
-    });
-
-
-    Country country = countryRepository.findById(companyDTO.getCountryId()).orElseThrow(() -> {
-        log.error(CLIENT_INVALID_ERROR_MSG2);
-        return new InvalidInputException(ErrorCode.CLIENT_INVALID, "Country not found");
-    });
+        City city = cityRepository.findById(companyDTO.getCityId()).orElseThrow(() -> {
+            log.error(CLIENT_INVALID_ERROR_MSG2);
+            return new InvalidInputException(ErrorCode.CLIENT_INVALID, "Country not found");
+        });
 
 
-    State state = stateRepository.findById(companyDTO.getStateId()).orElseThrow(() -> {
-        log.error("State not found");
-        return new InvalidInputException(ErrorCode.CLIENT_INVALID, "State not found");
-    });
+        Country country = countryRepository.findById(companyDTO.getCountryId()).orElseThrow(() -> {
+            log.error(CLIENT_INVALID_ERROR_MSG2);
+            return new InvalidInputException(ErrorCode.CLIENT_INVALID, "Country not found");
+        });
 
 
-
-            company.setName(companyDTO.getName());
-            company.setWebsite(companyDTO.getWebsite());
-            company.setSize(companyDTO.getSize());
-            company.setCountry(country);
-            company.setCity(city);
-            company.setState(state);
+        State state = stateRepository.findById(companyDTO.getStateId()).orElseThrow(() -> {
+            log.error("State not found");
+            return new InvalidInputException(ErrorCode.CLIENT_INVALID, "State not found");
+        });
 
 
-            return  CompanyMapper.toCompanyDTO(companyRepository.save(company));
+        company.setName(companyDTO.getName());
+        company.setWebsite(companyDTO.getWebsite());
+        company.setSize(companyDTO.getSize());
+        company.setCountry(country);
+        company.setCity(city);
+        company.setState(state);
+
+
+        return CompanyMapper.toCompanyDTO(companyRepository.save(company));
 
     }
 
@@ -196,5 +192,22 @@ public class CompanyServiceImpl implements CompanyService {
             }
         }
         return null;
+    }
+
+    @Override
+    public HiringConsultantDTO getHiringConsultant(String token) {
+        Long companyId = validator.extractCompanyId(token);
+        if (companyId == null) {
+            log.error(CLIENT_INVALID_ERROR_MSG);
+            throw new InvalidInputException(ErrorCode.CLIENT_INVALID, CLIENT_INVALID_ERROR_MSG);
+        }
+        Company company = companyRepository.findById(companyId).orElseThrow(() -> {
+            log.error(CLIENT_INVALID_ERROR_MSG);
+            return new InvalidInputException(ErrorCode.CLIENT_INVALID, CLIENT_INVALID_ERROR_MSG);
+        });
+
+        return CompanyMapper.toHiringConsultantDto(company);
+
+
     }
 }

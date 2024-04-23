@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8889}
+  port: ${SERVER_PORT:8887}
   servlet:
     context-path: /api
   application:
