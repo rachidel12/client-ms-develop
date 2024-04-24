@@ -1,9 +1,13 @@
 package ai.geteam.client.service;
 
 
+import ai.geteam.client.dto.ClientAccountInfoDTO;
 import ai.geteam.client.dto.InvitationEmailRequestDTO;
 import ai.geteam.client.dto.RecruiterDTO;
 import ai.geteam.client.entity.Company;
+import ai.geteam.client.entity.location.City;
+import ai.geteam.client.entity.location.Country;
+import ai.geteam.client.entity.location.State;
 import ai.geteam.client.entity.recruiter.Recruiter;
 import ai.geteam.client.repository.RecruiterRepository;
 import ai.geteam.client.service.recruiter.EmailService;
@@ -18,6 +22,7 @@ import ai.geteam.client.exception.ServerException;
 import ai.geteam.client.exception.UnAuthorizedException;
 import ai.geteam.client.feign.IamService;
 import ai.geteam.client.helper.JwtHelper;
+import ai.geteam.client.mapper.ClientAccountInfoMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,10 +89,16 @@ public class RecruiterServiceTest {
     private RecruiterDTO recruiterDTO3;
     private Company company1;
     private Company company2;
+    private Country country1;
+    private State state1;
+    private City city1;
 
     @BeforeEach
     public void setUp() {
-        company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, null, null, null, null, null);
+        country1 = new Country(1L, "Country Test 1", "CT1", null, null);
+        state1 = new State(1L, "State Test 1", "ST1", country1);
+        city1 = new City(1L, "City Test 1", "CT1", country1, state1);
+        company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, country1, state1, city1, null, null);
         company2 = new Company(2L, "Company Test 2", "www.companytest2.com", "size2", null, null, null, null, null, null, null);
         recruiter1 = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", false, "0606060606", company1, Status.ACTIVE);
         recruiter2 = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
@@ -506,7 +517,7 @@ public class RecruiterServiceTest {
 
     @Test
     @Tag("sendInvitation")
-    @DisplayName("SendInvitation Positive Case")
+    @DisplayName("SendInvitation Negative Case: Email empty")
     void RecruiterService_sendInvitation_ReturnsEmailNull(){
         // Arrange
         InvitationEmailRequestDTO invitationRequest = new InvitationEmailRequestDTO(null, null);
@@ -523,5 +534,41 @@ public class RecruiterServiceTest {
         verify(emailService, times(0)).sendInvitationEmail(anyString(), anyLong());
     }
 
+    @Test
+    @Tag("getClientPersonalInfo")
+    @DisplayName("getClientPersonalInfo Positif case")
+    void RecruiterService_getClientPersonalInfo_ReturnsRecruiterDTO(){
+        // Arrange
+        when(authentication.getName()).thenReturn("recruiter1@gmail.com");
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        
+        // Act
+        ClientAccountInfoDTO clientAccountInfoDTO = recruiterService.getClientPersonalInfo();
+        // Assert
+        assertEquals(clientAccountInfoDTO.getFirstName(), recruiter1.getFirstName());
+        assertEquals(clientAccountInfoDTO.getLastName(), recruiter1.getLastName());
+        assertEquals(clientAccountInfoDTO.getEmail(), recruiter1.getEmail());
+        verify(recruiterRepository, times(1)).findByEmail(anyString());
+    }
+
+    @Test
+    @Tag("getClientPersonalInfo")
+    @DisplayName("getClientPersonalInfo Negative case: Recruiter is empty")
+    void RecruiterService_getClientPersonalInfo_ReturnsRecruiterEmpty(){
+        // Arrange
+        when(authentication.getName()).thenReturn("recruiter99@gmail.com");
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+        when(recruiterRepository.findByEmail("recruiter99@gmail.com")).thenReturn(Optional.empty());
+        // Act
+        // Assert
+        assertThrows(InvalidInputException.class,() -> 
+            recruiterService.getClientPersonalInfo()
+        );
+        verify(recruiterRepository, times(1)).findByEmail(anyString());
+    }
 
 }
