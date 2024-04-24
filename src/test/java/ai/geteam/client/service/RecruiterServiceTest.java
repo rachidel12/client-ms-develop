@@ -1,12 +1,16 @@
 package ai.geteam.client.service;
 
 
+import ai.geteam.client.dto.InvitationEmailRequestDTO;
 import ai.geteam.client.dto.RecruiterDTO;
 import ai.geteam.client.entity.Company;
 import ai.geteam.client.entity.recruiter.Recruiter;
 import ai.geteam.client.repository.RecruiterRepository;
+import ai.geteam.client.service.recruiter.EmailService;
 import ai.geteam.client.service.recruiter.RecruiterService;
 import ai.geteam.client.service.recruiter.RecruiterServiceImpl;
+import ai.geteam.client.service.recruiter.RecruiterValidator;
+import ai.geteam.client.service.recruiter.validator.EmailValidator;
 import io.swagger.v3.oas.models.servers.Server;
 import ai.geteam.client.entity.recruiter.Status;
 import ai.geteam.client.exception.InvalidInputException;
@@ -59,6 +63,15 @@ public class RecruiterServiceTest {
 
     @Mock
     private JwtHelper jwtHelper;
+
+    @Mock
+    private RecruiterValidator validator;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private EmailValidator emailValidator;
 
     @InjectMocks
     private RecruiterServiceImpl recruiterService;
@@ -463,6 +476,51 @@ public class RecruiterServiceTest {
         
         verify(recruiterRepository, times(1)).deleteById(anyLong());
         verify(iamService, times(1)).deleteUser(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @Tag("sendInvitation")
+    @DisplayName("SendInvitation Positive Case")
+    void RecruiterService_sendInvitation_ReturnsSuccess(){
+        // Arrange
+        InvitationEmailRequestDTO invitationRequest = new InvitationEmailRequestDTO("test@example.com", "123456");
+        String authorizationHeader = "Bearer Token";
+        Long companyId = 1L;
+        Long recruiterId = 1L;
+        RecruiterDTO recruiterDTO = new RecruiterDTO(null, null, null, "test@example.com", false, null, companyId, Status.INVITED);
+        when(validator.verifyIsAdmin(anyString())).thenReturn(true);
+        when(validator.userDoesNotExist(anyString(), anyString())).thenReturn(true);
+        when(validator.extractCompanyId(anyString())).thenReturn(companyId);
+        when(validator.addNewUserToDatabase(recruiterDTO)).thenReturn(recruiterId);
+        doNothing().when(emailService).sendInvitationEmail(anyString(), anyLong());
+        when(emailValidator.test("test@example.com")).thenReturn(true);
+        // Act
+        recruiterService.sendInvitation(authorizationHeader, invitationRequest);
+        // Assert
+        verify(validator, times(1)).verifyIsAdmin(anyString());
+        verify(validator, times(1)).userDoesNotExist(anyString(), anyString());
+        verify(validator, times(1)).extractCompanyId(anyString());
+        verify(validator, times(1)).addNewUserToDatabase(any(RecruiterDTO.class));
+        verify(emailService, times(1)).sendInvitationEmail(anyString(), anyLong());
+    }
+
+    @Test
+    @Tag("sendInvitation")
+    @DisplayName("SendInvitation Positive Case")
+    void RecruiterService_sendInvitation_ReturnsEmailNull(){
+        // Arrange
+        InvitationEmailRequestDTO invitationRequest = new InvitationEmailRequestDTO(null, null);
+        String authorizationHeader = "Bearer Token";
+        when(validator.verifyIsAdmin(anyString())).thenReturn(true);
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.sendInvitation(authorizationHeader, invitationRequest));
+
+        verify(validator, times(1)).verifyIsAdmin(anyString());
+        verify(validator, times(0)).userDoesNotExist(anyString(), anyString());
+        verify(validator, times(0)).extractCompanyId(anyString());
+        verify(validator, times(0)).addNewUserToDatabase(any(RecruiterDTO.class));
+        verify(emailService, times(0)).sendInvitationEmail(anyString(), anyLong());
     }
 
 
