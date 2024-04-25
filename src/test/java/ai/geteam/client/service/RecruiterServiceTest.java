@@ -4,6 +4,7 @@ package ai.geteam.client.service;
 import ai.geteam.client.dto.ClientAccountInfoDTO;
 import ai.geteam.client.dto.InvitationEmailRequestDTO;
 import ai.geteam.client.dto.RecruiterDTO;
+import ai.geteam.client.dto.RoleDTO;
 import ai.geteam.client.entity.Company;
 import ai.geteam.client.entity.location.City;
 import ai.geteam.client.entity.location.Country;
@@ -15,6 +16,7 @@ import ai.geteam.client.service.recruiter.RecruiterService;
 import ai.geteam.client.service.recruiter.RecruiterServiceImpl;
 import ai.geteam.client.service.recruiter.RecruiterValidator;
 import ai.geteam.client.service.recruiter.validator.EmailValidator;
+import ai.geteam.client.utils.MainUtils;
 import io.swagger.v3.oas.models.servers.Server;
 import ai.geteam.client.entity.recruiter.Status;
 import ai.geteam.client.exception.InvalidInputException;
@@ -78,6 +80,9 @@ public class RecruiterServiceTest {
     @Mock
     private EmailValidator emailValidator;
 
+    @Mock
+    private MainUtils mainUtils;
+
     @InjectMocks
     private RecruiterServiceImpl recruiterService;
 
@@ -100,7 +105,7 @@ public class RecruiterServiceTest {
         city1 = new City(1L, "City Test 1", "CT1", country1, state1);
         company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, country1, state1, city1, null, null);
         company2 = new Company(2L, "Company Test 2", "www.companytest2.com", "size2", null, null, null, null, null, null, null);
-        recruiter1 = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", false, "0606060606", company1, Status.ACTIVE);
+        recruiter1 = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", true, "0606060606", company1, Status.ACTIVE);
         recruiter2 = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
         recruiter3 = new Recruiter(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", company2, Status.ACTIVE);
         recruiterDTO1 = new RecruiterDTO(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", false, "0606060606", 1L, Status.ACTIVE);
@@ -569,6 +574,65 @@ public class RecruiterServiceTest {
             recruiterService.getClientPersonalInfo()
         );
         verify(recruiterRepository, times(1)).findByEmail(anyString());
+    }
+
+    @Test
+    @Tag("assignAdminRole")
+    @DisplayName("assignAdminRole Positive case")
+    void RecruiterService_assignAdminRole_ReturnsAdminRecruiter(){
+        // Arrange
+        Long userId = 2L;
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setAdmin(true);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.save(recruiter2)).thenReturn(recruiter2);
+        // Act
+        RecruiterDTO result = recruiterService.assignAdminRole(userId, roleDTO);
+        // Assert
+        assertTrue(result.isAdmin());
+        verify(recruiterRepository, times(1)).findById(userId);
+    }
+
+    @Test
+    @Tag("assignAdminRole")
+    @DisplayName("assignAdminRole Negative case: User not found")
+    void RecruiterService_assignAdminRole_ReturnsNoRecruiter(){
+        // Arrange
+        Long userId = 2L;
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setAdmin(true);
+        recruiter2.setCompany(company2);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        // Act
+        assertThrows(InvalidInputException.class, () ->
+            recruiterService.assignAdminRole(userId, roleDTO));   
+        // Assert
+        assertFalse(recruiter2.isAdmin());
+        verify(recruiterRepository, times(1)).findById(userId);
+    }
+
+    @Test
+    @Tag("assignAdminRole")
+    @DisplayName("assignAdminRole Negative case: Recruiter is not an admin")
+    void RecruiterService_assignAdminRole_ReturnsRecruiterNotAdmin(){
+        // Arrange
+        Long userId = 2L;
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setAdmin(true);
+        recruiter1.setAdmin(false);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        // Act
+        assertThrows(InvalidInputException.class, () ->
+            recruiterService.assignAdminRole(userId, roleDTO));   
+        // Assert
+        assertFalse(recruiter2.isAdmin());
+        verify(recruiterRepository, times(1)).findById(userId);
     }
 
 }
