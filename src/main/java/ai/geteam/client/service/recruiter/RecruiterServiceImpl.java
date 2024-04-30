@@ -334,7 +334,7 @@ public class RecruiterServiceImpl implements RecruiterService {
             log.error("Client already blocked");
             throw new InvalidInputException(ErrorCode.USER_ALREADY_BLOCKED, "recruiter already blocked");
         }
-        //get the admin email to get the recruiter in ms-recruiter database
+        //get the admin email to get the recruiter in ms-client database
         String userEmail = (String) token.getClaims().get("email");
         log.info("getting the user email (Admin) : " + userEmail);
         //test if the token has a none empty email
@@ -351,19 +351,16 @@ public class RecruiterServiceImpl implements RecruiterService {
             log.error("the user is not an admin, unauthorized action");
             throw new InvalidInputException(ErrorCode.USER_NOT_ADMIN, "User is not an admin");
         }
-        //check if the user has recruiter role
-        String clientRole = tokenService.getRole(token).stream().filter(item -> item.equals("CLIENT")).findFirst().orElseThrow(() -> new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_ROLE_CLIENT, "User is unauthorized to do this action"));
-        log.info("The admin is with " + clientRole + " Role");
 
         //test if the admin and recruiter are in the same team
         if (!((admin.getCompanyId()).equals(recruiter.getCompany().getId()))) {
             log.error("The admin and the user are not in the same team, unauthorized action");
             throw new InvalidInputException(ErrorCode.USER_NOT_IN_SAME_TEAM, "admin and recruiter not in the same team");
         }
-        //test if access token is in the keycloak realm 'recruiter'
-        if (!(tokenService.getRealm(token).equals("recruiter"))) {
-            log.error("the access token is not from 'recruiter' realm");
-            throw new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_REALM_CLIENT, " user is not in 'recruiter' realm");
+        //test if access token is in the keycloak realm 'client'
+        if (!(tokenService.getRealm(token).equals("client"))) {
+            log.error("the access token is not from 'client' realm");
+            throw new UnAuthorizedException(ErrorCode.ACCESS_TOKEN_NOT_REALM_CLIENT, " user is not in 'client' realm");
         }
         recruiter.setStatus(Status.BLOCKED);
         recruiter = recruiterRepository.save(recruiter);
@@ -399,6 +396,21 @@ public class RecruiterServiceImpl implements RecruiterService {
                 signatureRepository.findById(signatureId)
                         .orElseThrow(() -> new InvalidInputException(ErrorCode.SIGNATURE_NOT_FOUND, "This signature does not exist"))
         );
+    }
+
+    @Override
+    public String getClientId(String email) {
+        if (!emailValidator.test(email)) {
+            String ms = "Invalid email";
+            log.error(ms);
+            throw new InvalidInputException(ErrorCode.EMAIL_INVALID, ms);
+        }
+        Recruiter recruiter = recruiterRepository.findByEmail(email).orElseThrow(() -> {
+            String ms = "No user is with this email";
+            log.error(ms);
+            return new InvalidInputException(ErrorCode.NO_USER_WITH_THIS_EMAIL, ms);
+        });
+        return String.valueOf(recruiter.getCompany().getId());
     }
 
     @Override

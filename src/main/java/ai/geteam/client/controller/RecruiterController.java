@@ -112,4 +112,10 @@ public class RecruiterController {
     public ResponseEntity<SignatureDTO> setDefaultSignature(@NonNull @PathVariable(name = "signatureId") Long signatureId, @RequestHeader(name="Authorization") String authorization) {
     	return ResponseEntity.status(HttpStatus.OK).body(recruiterService.setdefaultSignature(signatureId, authorization));
     }
+
+    @PreAuthorize("hasRole('CLIENT')")
+    @GetMapping("id")
+    public ResponseEntity<String>  getClientId(@RequestParam String email) {
+        return ResponseEntity.ok(recruiterService.getClientId(email));
+    }
 }

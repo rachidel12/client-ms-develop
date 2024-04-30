@@ -18,8 +18,7 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
     hibernate:
-
-      ddl-auto: create
+      ddl-auto: update
 
   mvc:
     format:
@@ -108,4 +107,4 @@ springdoc:
   swagger-ui:
     oauth:
       client-id: client
-      client-secret: 5dfa0303-0e33-4ebd-8409-1a4d536eea5b
+      client-secret: ${CLIENT_SECRET:fde6589d-0fd3-4626-a66c-b085c284add8}

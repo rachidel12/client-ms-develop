@@ -37,4 +37,5 @@ public interface RecruiterService {
 
     SignatureDTO getSignatureById(Long signatureId, String authorization);
 
+    String getClientId(String email);
 }

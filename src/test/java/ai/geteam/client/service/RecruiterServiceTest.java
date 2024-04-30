@@ -19,12 +19,14 @@ import ai.geteam.client.service.recruiter.validator.EmailValidator;
 import ai.geteam.client.utils.MainUtils;
 import io.swagger.v3.oas.models.servers.Server;
 import ai.geteam.client.entity.recruiter.Status;
+import ai.geteam.client.exception.BaseException;
 import ai.geteam.client.exception.InvalidInputException;
 import ai.geteam.client.exception.ServerException;
 import ai.geteam.client.exception.UnAuthorizedException;
 import ai.geteam.client.feign.IamService;
 import ai.geteam.client.helper.JwtHelper;
 import ai.geteam.client.mapper.ClientAccountInfoMapper;
+import ai.geteam.client.mapper.RecruiterMapper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +52,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -106,10 +111,10 @@ public class RecruiterServiceTest {
         company1 = new Company(1L, "Company Test 1", "www.companytest1.com", "size1", null, null, country1, state1, city1, null, null);
         company2 = new Company(2L, "Company Test 2", "www.companytest2.com", "size2", null, null, null, null, null, null, null);
         recruiter1 = new Recruiter(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", true, "0606060606", company1, Status.ACTIVE);
-        recruiter2 = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
+        recruiter2 = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.BLOCKED);
         recruiter3 = new Recruiter(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", company2, Status.ACTIVE);
-        recruiterDTO1 = new RecruiterDTO(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", false, "0606060606", 1L, Status.ACTIVE);
-        recruiterDTO2 = new RecruiterDTO(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", 1L, Status.ACTIVE);
+        recruiterDTO1 = new RecruiterDTO(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", true, "0606060606", 1L, Status.ACTIVE);
+        recruiterDTO2 = new RecruiterDTO(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", 1L, Status.BLOCKED);
         recruiterDTO3 = new RecruiterDTO(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", 2L, Status.ACTIVE);
         
         // MockitoAnnotations.openMocks(this);
@@ -635,4 +640,167 @@ public class RecruiterServiceTest {
         verify(recruiterRepository, times(1)).findById(userId);
     }
 
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Positive case")
+    void RecruiterService_updateRecruiter_ReturnsRecruiterUpdated(){
+        // Arrange
+        String firstName = "updatedFI";
+        String lastName = "updatedLA";
+        String phone = "+0707070707";
+        Recruiter recruiterUpdated = new Recruiter(1L, firstName, lastName, "recruiter99@gmail.com", true, phone, company1, Status.ACTIVE);
+
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.empty());
+        when(recruiterRepository.save(recruiter1)).thenReturn(recruiterUpdated);
+        // Act
+        recruiterService.updateRecruiter(firstName, lastName, phone);
+        // Assert
+        assertEquals(recruiterUpdated.getFirstName(), firstName); 
+        assertEquals(recruiterUpdated.getLastName(), lastName);
+        assertEquals(recruiterUpdated.getPhone(), phone); 
+        verify(recruiterRepository,times(1)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Recruiter is null")
+    void RecruiterService_updateRecruiter_ReturnsNoRecruiter(){
+        // Arrange
+        String firstName = "updatedFI";
+        String lastName = "updatedLA";
+        String phone = "+0707070707";
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        // Act // Assert
+        assertThrows(BaseException.class, () -> 
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Phone already exists")
+    void RecruiterService_updateRecruiter_ReturnsPhoneExists(){
+        // Arrange
+        String firstName = "updatedFI";
+        String lastName = "updatedLA";
+        String phone = "0606060606";
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.of(recruiter1));
+        // Act
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Invalid phone")
+    void RecruiterService_updateRecruiter_ReturnsInvalidPhone(){
+        // Arrange
+        String firstName = "updatedFI";
+        String lastName = "updatedLA";
+        String phone = "0707070707";
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Invalid firstname")
+    void RecruiterService_updateRecruiter_ReturnsInvalidFirstname(){
+        // Arrange
+        String firstName = "";
+        String lastName = "updatedLA";
+        String phone = "+0707070707";
+        Recruiter recruiterUpdated = new Recruiter(99L, firstName, lastName, "recruiter99@gmail.com", true, phone, company1, Status.ACTIVE);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Invalid lastname")
+    void RecruiterService_updateRecruiter_ReturnsInvalidLastname(){
+        // Arrange
+        String firstName = "updatedfi";
+        String lastName = "";
+        String phone = "+0707070707";
+        Recruiter recruiterUpdated = new Recruiter(99L, firstName, lastName, "recruiter99@gmail.com", true, phone, company1, Status.ACTIVE);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("activateInvitedClient")
+    @DisplayName("activateInvitedClient Positive case")
+    void RecruiterService_activateInvitedClient_ReturnsRecruiter(){
+        // Arrange
+        Long userId = 2L;
+        String status = "ACTIVE";
+        Recruiter recruiterUpdated = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
+        RecruiterDTO recruiterupdatedDTO = RecruiterMapper.toRecruiterDTO(recruiterUpdated);
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.save(recruiter2)).thenReturn(recruiterUpdated);
+        // Act
+        RecruiterDTO recruiter = recruiterService.activateInvitedClient(userId, status);
+
+        // Assert
+        assertEquals(recruiterupdatedDTO, recruiter);
+        verify(recruiterRepository,times(1)).save(recruiter2);
+    }
+
+    @Test
+    @Tag("activateInvitedClient")
+    @DisplayName("activateInvitedClient Negative case: Recruiter is not found")
+    void RecruiterService_activateInvitedClient_ReturnsNoRecruiter(){
+        // Arrange
+        Long userId = 99L;
+        String status = "ACTIVE";
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, () ->
+                    recruiterService.activateInvitedClient(userId, status));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter2);
+    }
+
+    @Test
+    @Tag("getUserEmail")
+    @DisplayName("getUserEmail Positive case")
+    void RecruiterService_getUserEmail_ReturnsEmail(){
+        // Arrange
+        when(authentication.getName()).thenReturn("recruiter99@gmail.com");
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+        // Act
+        String email = recruiterService.getUserEmail();
+        // Assert
+        assertEquals("recruiter99@gmail.com", email);
+    }
+
 }
+
