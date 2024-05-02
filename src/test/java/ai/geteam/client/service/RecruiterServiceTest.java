@@ -16,6 +16,7 @@ import ai.geteam.client.service.recruiter.RecruiterService;
 import ai.geteam.client.service.recruiter.RecruiterServiceImpl;
 import ai.geteam.client.service.recruiter.RecruiterValidator;
 import ai.geteam.client.service.recruiter.validator.EmailValidator;
+import ai.geteam.client.service.token.TokenServiceImpl;
 import ai.geteam.client.utils.MainUtils;
 import io.swagger.v3.oas.models.servers.Server;
 import ai.geteam.client.entity.recruiter.Status;
@@ -38,6 +39,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.OAuth2ResourceServerProperties.Jwt;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -83,6 +85,9 @@ public class RecruiterServiceTest {
     private EmailService emailService;
 
     @Mock
+    private TokenServiceImpl tokenService;
+
+    @Mock
     private EmailValidator emailValidator;
 
     @Mock
@@ -116,7 +121,6 @@ public class RecruiterServiceTest {
         recruiterDTO1 = new RecruiterDTO(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", true, "0606060606", 1L, Status.ACTIVE);
         recruiterDTO2 = new RecruiterDTO(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", 1L, Status.BLOCKED);
         recruiterDTO3 = new RecruiterDTO(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", 2L, Status.ACTIVE);
-        
         // MockitoAnnotations.openMocks(this);
         
     }
@@ -801,6 +805,80 @@ public class RecruiterServiceTest {
         // Assert
         assertEquals("recruiter99@gmail.com", email);
     }
+
+    // @Test
+    // @Tag("unblockRecruiterInKeycloak")
+    // @DisplayName("unblockRecruiterInKeycloak Positive case")
+    // void RecruiterService_unblockRecruiterInKeycloak_ReturnsUnblocked(){
+    //     // Arrange
+    //     String email = "recruiter2@gmail.com";
+    //     String authorization = "Bearer Token";
+    //     String realm = "client";
+    //     ResponseEntity<String> response = ResponseEntity.ok().build();
+    //     when(iamService.unblockRecruiter(realm, email, authorization)).thenReturn(response);
+    //     // Act
+    //     recruiterService.unblockRecruiterInKeycloak(email, authorization);
+    // }
+
+
+    @Test
+    @Tag("updateRecruiterStatus")
+    @DisplayName("updateRecruiterStatus Positive case")
+    void RecruiterService_updateRecruiterStatus_ReturnsRecruiter(){
+        // Arrange
+        Long userId = 2L;
+        String authorization = "Bearer Token";
+        String email = "recruiter2@gmail.com";
+        Recruiter recruiterUpdated = new Recruiter(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", company1, Status.ACTIVE);
+        RecruiterDTO recruiterupdatedDTO = RecruiterMapper.toRecruiterDTO(recruiterUpdated);
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSameCompany(recruiter2, authorization);
+        doNothing().when(validator).validateRecruiterStatus(recruiter2);
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.save(recruiter2)).thenReturn(recruiterUpdated);
+        ResponseEntity<String> response = ResponseEntity.ok().build();
+        when(iamService.unblockRecruiter(null, email, authorization)).thenReturn(response);
+        RecruiterDTO result = recruiterService.updateRecruiterStatus(userId, authorization);
+        // Assert
+        assertEquals(recruiterupdatedDTO, result);
+        verify(recruiterRepository,times(1)).save(recruiter2);
+    }
+
+    @Test
+    @Tag("updateRecruiterStatus")
+    @DisplayName("updateRecruiterStatus Negative case: Recruiter not found")
+    void RecruiterService_updateRecruiterStatus_ReturnsNoRecruiter(){
+        // Arrange
+        Long userId = 99L;
+        String authorization = "Bearer Token";when(recruiterRepository.findById(userId)).thenReturn(Optional.empty());
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiterStatus(userId, authorization));
+        // Assert
+        verify(recruiterRepository,times(0)).save(any());
+    }
+
+    @Test
+    @Tag("updateRecruiterStatus")
+    @DisplayName("updateRecruiterStatus Negative case: unable to unblock client")
+    void RecruiterService_updateRecruiterStatus_ReturnsErrorUnblock(){
+        // Arrange
+        Long userId = 2L;
+        String authorization = "Bearer Token";
+        String email = "recruiter2@gmail.com";
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSameCompany(recruiter2, authorization);
+        doNothing().when(validator).validateRecruiterStatus(recruiter2);
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        ResponseEntity<String> response = ResponseEntity.badRequest().build();
+        when(iamService.unblockRecruiter(null, email, authorization)).thenReturn(response);
+        assertThrows(BaseException.class, ()->
+                    recruiterService.updateRecruiterStatus(userId, authorization));
+        // Assert
+        verify(recruiterRepository,times(0)).save(any());
+    }
+
 
 }
 
