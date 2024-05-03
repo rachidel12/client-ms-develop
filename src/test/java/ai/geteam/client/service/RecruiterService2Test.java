@@ -51,7 +51,7 @@ import ai.geteam.client.service.recruiter.validator.EmailValidator;
 import ai.geteam.client.service.token.TokenServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
-public class RecruiterServiceTest2 {
+public class RecruiterService2Test {
     
 
     @Mock
