@@ -3,10 +3,12 @@ package ai.geteam.client.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -384,5 +386,121 @@ public class RecruiterServiceTest2 {
             recruiterService.getClientId(email));
         
         verify(recruiterRepository, times(1)).findByEmail(email);
+    }
+
+    @Test
+    @Tag("setdefaultSignature")
+    @DisplayName("setdefaultSignature Negative case: SignatureId doesn't exist")
+    void RecruiterService_setdefaultSignature_ReturnsNoSignature(){
+        // Arrange
+        String authorization = "Bearer token";
+        Long signatureId = 99L;
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        when(signatureRepository.findById(signatureId)).thenReturn(Optional.empty());
+        //Act
+        assertThrows(InvalidInputException.class, ()->
+                    recruiterService.setdefaultSignature(signatureId, authorization));
+        // Assert
+        verify(signatureRepository, times(0)).save(any());
+    }
+
+    @Test
+    @Tag("setdefaultSignature")
+    @DisplayName("setdefaultSignature Positive case: Multiple default signatures exist")
+    void RecruiterService_setdefaultSignature_ReturnsSignatureMulti(){
+        // Arrange
+        String authorization = "Bearer token";
+        Long signatureId = 1L;
+        Signature signatureEntity1 = new Signature(signatureId, Name.TEXT, "signature1", true, company1);
+        Signature signatureEntity2 = new Signature(2L, Name.TEXT, "signature2", true, company1);
+        SignatureDTO signatureDTO1 = new SignatureDTO(signatureId, "TEXT", "signature1", true);
+        List<Signature> signatures = new ArrayList<>();
+        signatures.add(signatureEntity1);
+        signatures.add(signatureEntity2);
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSignatureCompany(authorization, signatureEntity1);
+        when(signatureRepository.findById(signatureId)).thenReturn(Optional.of(signatureEntity1));
+        when(signatureRepository.findByCompanyIdAndDefaultValueTrue(1L)).thenReturn(signatures);
+        when(signatureRepository.save(any())).thenReturn(null);
+
+        //Act
+        SignatureDTO result = recruiterService.setdefaultSignature(signatureId, authorization);
+        // Assert
+        assertEquals(signatureDTO1, result);
+        verify(signatureRepository, times(3)).save(any());
+    }
+
+    @Test
+    @Tag("setdefaultSignature")
+    @DisplayName("setdefaultSignature Positive case: One default signature already exists")
+    void RecruiterService_setdefaultSignature_ReturnsSignatureOne(){
+        // Arrange
+        String authorization = "Bearer token";
+        Signature signatureEntity1 = new Signature(1L, Name.TEXT, "signature1", true, company1);
+        Signature signatureEntity2 = new Signature(2L, Name.TEXT, "signature2", false, company1);
+        SignatureDTO signatureDTO2 = new SignatureDTO(2L, "TEXT", "signature2", true);
+        List<Signature> signatures = new ArrayList<>();
+        signatures.add(signatureEntity1);
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSignatureCompany(authorization, signatureEntity2);
+        when(signatureRepository.findById(2L)).thenReturn(Optional.of(signatureEntity2));
+        when(signatureRepository.findByCompanyIdAndDefaultValueTrue(1L)).thenReturn(signatures);
+        when(signatureRepository.save(any())).thenReturn(null);
+
+        //Act
+        SignatureDTO result = recruiterService.setdefaultSignature(2L, authorization);
+        // Assert
+        assertEquals(signatureDTO2, result);
+        verify(signatureRepository, times(2)).save(any());
+    }
+
+    @Test
+    @Tag("setdefaultSignature")
+    @DisplayName("setdefaultSignature Negative case: Set the default signature to default")
+    void RecruiterService_setdefaultSignature_ReturnsSameDefault(){
+        // Arrange
+        String authorization = "Bearer token";
+        Signature signatureEntity1 = new Signature(1L, Name.TEXT, "signature1", true, company1);
+        SignatureDTO signatureDTO1 = new SignatureDTO(1L, "TEXT", "signature1", true);
+        List<Signature> signatures = new ArrayList<>();
+        signatures.add(signatureEntity1);
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSignatureCompany(authorization, signatureEntity1);
+        when(signatureRepository.findById(1L)).thenReturn(Optional.of(signatureEntity1));
+        when(signatureRepository.findByCompanyIdAndDefaultValueTrue(1L)).thenReturn(signatures);
+        when(signatureRepository.save(any())).thenReturn(null);
+
+        //Act
+        SignatureDTO result = recruiterService.setdefaultSignature(1L, authorization);
+        // Assert
+        assertEquals(signatureDTO1, result);
+        verify(signatureRepository, times(1)).save(any());
+    }
+
+    @Test
+    @Tag("setdefaultSignature")
+    @DisplayName("setdefaultSignature Positive case")
+    void RecruiterService_setdefaultSignature_ReturnsDefaultSignature(){
+        // Arrange
+        String authorization = "Bearer token";
+        Signature signatureEntity1 = new Signature(1L, Name.TEXT, "signature1", false, company1);
+        SignatureDTO signatureDTO1 = new SignatureDTO(1L, "TEXT", "signature1", true);
+        List<Signature> signatures = new ArrayList<>();
+        doNothing().when(validator).validateAdmin(authorization);
+        doNothing().when(validator).validateStatusActive(authorization);
+        doNothing().when(validator).validateSignatureCompany(authorization, signatureEntity1);
+        when(signatureRepository.findById(1L)).thenReturn(Optional.of(signatureEntity1));
+        when(signatureRepository.findByCompanyIdAndDefaultValueTrue(1L)).thenReturn(signatures);
+        when(signatureRepository.save(any())).thenReturn(null);
+
+        //Act
+        SignatureDTO result = recruiterService.setdefaultSignature(1L, authorization);
+        // Assert
+        assertEquals(signatureDTO1, result);
+        verify(signatureRepository, times(1)).save(any());
     }
 }

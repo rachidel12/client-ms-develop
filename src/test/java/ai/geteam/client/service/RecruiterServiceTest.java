@@ -531,7 +531,7 @@ public class RecruiterServiceTest {
 
     @Test
     @Tag("sendInvitation")
-    @DisplayName("SendInvitation Negative Case: Email empty")
+    @DisplayName("SendInvitation Negative Case: Email null")
     void RecruiterService_sendInvitation_ReturnsEmailNull(){
         // Arrange
         InvitationEmailRequestDTO invitationRequest = new InvitationEmailRequestDTO(null, null);
@@ -546,6 +546,22 @@ public class RecruiterServiceTest {
         verify(validator, times(0)).extractCompanyId(anyString());
         verify(validator, times(0)).addNewUserToDatabase(any(RecruiterDTO.class));
         verify(emailService, times(0)).sendInvitationEmail(anyString(), anyLong());
+    }
+
+    @Test
+    @Tag("sendInvitation")
+    @DisplayName("SendInvitation Negative Case: Email empty")
+    void RecruiterService_sendInvitation_ReturnsEmailEmpty(){
+        // Arrange
+        InvitationEmailRequestDTO invitationRequest = new InvitationEmailRequestDTO("", null);
+        String authorizationHeader = "Bearer Token";
+        when(validator.verifyIsAdmin(anyString())).thenReturn(true);
+        // Act & Assert
+        assertThrows(InvalidInputException.class, () -> 
+            recruiterService.sendInvitation(authorizationHeader, invitationRequest));
+
+        verify(validator, times(1)).verifyIsAdmin(anyString());
+        verify(validator, times(0)).userDoesNotExist(anyString(), anyString());
     }
 
     @Test
@@ -606,8 +622,44 @@ public class RecruiterServiceTest {
 
     @Test
     @Tag("assignAdminRole")
-    @DisplayName("assignAdminRole Negative case: User not found")
-    void RecruiterService_assignAdminRole_ReturnsNoRecruiter(){
+    @DisplayName("assignAdminRole Negative case: User with userId not found")
+    void RecruiterService_assignAdminRole_ReturnsNotFoundUserid(){
+        // Arrange
+        Long userId = 99L;
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setAdmin(true);
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, () ->
+            recruiterService.assignAdminRole(userId, roleDTO));   
+        // Assert
+        assertFalse(recruiter2.isAdmin());
+        verify(recruiterRepository, times(0)).findByEmail(any());
+    }
+
+    @Test
+    @Tag("assignAdminRole")
+    @DisplayName("assignAdminRole Negative case: Admin not found")
+    void RecruiterService_assignAdminRole_ReturnsNotFoundAdmin(){
+        // Arrange
+        Long userId = 2L;
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setAdmin(true);
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter99@gmail.com");
+        when(recruiterRepository.findById(userId)).thenReturn(Optional.of(recruiter2));
+        when(recruiterRepository.findByEmail("recruiter99@gmail.com")).thenReturn(Optional.empty());
+        // Act
+        assertThrows(InvalidInputException.class, () ->
+            recruiterService.assignAdminRole(userId, roleDTO));   
+        // Assert
+        assertFalse(recruiter2.isAdmin());
+        verify(recruiterRepository, times(1)).findByEmail(any());
+    }
+    
+    @Test
+    @Tag("assignAdminRole")
+    @DisplayName("assignAdminRole Negative case: Recruiter and admin not in the same company")
+    void RecruiterService_assignAdminRole_ReturnsNotSameCompany(){
         // Arrange
         Long userId = 2L;
         RoleDTO roleDTO = new RoleDTO();
@@ -692,8 +744,8 @@ public class RecruiterServiceTest {
         String firstName = "updatedFI";
         String lastName = "updatedLA";
         String phone = "0606060606";
-        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
-        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter2@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter2@gmail.com")).thenReturn(Optional.of(recruiter2));
         when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.of(recruiter1));
         // Act
         assertThrows(InvalidInputException.class, ()->
