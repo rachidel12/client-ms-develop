@@ -344,6 +344,22 @@ public class RecruiterService2Test {
         // Assert
         assertEquals(signatureDTO, result);
     }
+
+    @Test
+    @Tag("getSignatureById")
+    @DisplayName("getSignatureById Negative case: No signature Found")
+    void RecruiterService_getSignatureById_ReturnsNotFound(){
+        // Arrange
+        String authorization = "Bearer token";
+        Long signatureId = 1L;
+        Signature signatureEntity = new Signature(signatureId, Name.TEXT, "signature", true, company1);
+        SignatureDTO signatureDTO = SignatureMapper.toSignatureDTO(signatureEntity);
+        when(validator.verifyIsAdmin(authorization)).thenReturn(true);
+        when(signatureRepository.findById(signatureId)).thenReturn(Optional.empty());
+        //Act // Assert
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.getSignatureById(signatureId, authorization));     
+    }
     
     @Test
     @Tag("getClientId")

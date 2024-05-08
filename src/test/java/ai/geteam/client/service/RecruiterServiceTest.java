@@ -756,6 +756,24 @@ public class RecruiterServiceTest {
 
     @Test
     @Tag("updateRecruiter")
+    @DisplayName("updateRecruiter Negative case: Phone already exists 2")
+    void RecruiterService_updateRecruiter_ReturnsPhoneExists2(){
+        // Arrange
+        String firstName = "updatedFI";
+        String lastName = "updatedLA";
+        String phone = "0606060606";
+        when(mainUtils.getPrincipalMail()).thenReturn("recruiter1@gmail.com");
+        when(recruiterRepository.findByEmail("recruiter1@gmail.com")).thenReturn(Optional.of(recruiter1));
+        when(recruiterRepository.findByPhone(phone)).thenReturn(Optional.of(recruiter1));
+        // Act
+        assertThrows(InvalidInputException.class, ()->
+            recruiterService.updateRecruiter(firstName, lastName, phone));
+        // Assert
+        verify(recruiterRepository,times(0)).save(recruiter1);
+    }
+
+    @Test
+    @Tag("updateRecruiter")
     @DisplayName("updateRecruiter Negative case: Invalid phone")
     void RecruiterService_updateRecruiter_ReturnsInvalidPhone(){
         // Arrange
