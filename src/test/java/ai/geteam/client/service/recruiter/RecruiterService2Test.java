@@ -1,4 +1,4 @@
-package ai.geteam.client.service;
+package ai.geteam.client.service.recruiter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

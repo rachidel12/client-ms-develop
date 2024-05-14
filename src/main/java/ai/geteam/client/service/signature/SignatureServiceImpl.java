@@ -93,10 +93,10 @@ public class SignatureServiceImpl implements SignatureService{
             throw new InvalidInputException(ErrorCode.NAME_INVALID,"Signature name is invalid");
         }
         log.info("Signature name field is valid");
-        if(signatureDTO.getValue()==null ) {
-            log.error("The value of signature is null");
-            throw new InvalidInputException(ErrorCode.SIGNATURE_EMPTY,"Signature is null");
-        }
+        // if(signatureDTO.getValue()==null ) {
+        //     log.error("The value of signature is null");
+        //     throw new InvalidInputException(ErrorCode.SIGNATURE_EMPTY,"Signature is null");
+        // }
         log.info("The signature value is valid");
         //set signature from the signatureDTO input
         log.info("Creating the signature...");

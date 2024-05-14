@@ -1,4 +1,4 @@
-package ai.geteam.client.service;
+package ai.geteam.client.service.recruiter;
 
 
 import ai.geteam.client.dto.ClientAccountInfoDTO;
@@ -121,8 +121,7 @@ public class RecruiterServiceTest {
         recruiterDTO1 = new RecruiterDTO(1L, "recruiterFI1", "recruiterLA1", "recruiter1@gmail.com", true, "0606060606", 1L, Status.ACTIVE);
         recruiterDTO2 = new RecruiterDTO(2L, "recruiterFI2", "recruiterLA2", "recruiter2@gmail.com", false, "0707070707", 1L, Status.BLOCKED);
         recruiterDTO3 = new RecruiterDTO(3L, "recruiterFI3", "recruiterLA3", "recruiter3@gmail.com", false, "0606060606", 2L, Status.ACTIVE);
-        // MockitoAnnotations.openMocks(this);
-        
+        // MockitoAnnotations.openMocks(this);  
     }
 
     @Test
